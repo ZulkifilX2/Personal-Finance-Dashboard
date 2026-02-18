@@ -10,26 +10,71 @@ const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
     const [file, setFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const [message, setMessage] = useState('');
+    const [isError, setIsError] = useState(false);
+
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    const ALLOWED_TYPES = ['text/csv', 'application/vnd.ms-excel', '.csv'];
+
+    const validateFile = (selectedFile: File): string | null => {
+        // Check file extension
+        const lastDotIndex = selectedFile.name.lastIndexOf('.');
+        const extension = lastDotIndex !== -1 ? selectedFile.name.substring(lastDotIndex).toLowerCase() : '';
+
+        if (!ALLOWED_TYPES.includes(selectedFile.type) && !ALLOWED_TYPES.includes(extension)) {
+            return 'Invalid file type. Please upload a CSV file.';
+        }
+
+        if (selectedFile.size > MAX_FILE_SIZE) {
+            return 'File size too large. Maximum size is 5MB.';
+        }
+
+        return null;
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setFile(e.target.files[0]);
+        const selectedFile = e.target.files?.[0];
+        setMessage('');
+        setIsError(false);
+
+        if (selectedFile) {
+            const error = validateFile(selectedFile);
+            if (error) {
+                setMessage(error);
+                setIsError(true);
+                setFile(null);
+                e.target.value = ''; // Reset input
+                return;
+            }
+            setFile(selectedFile);
+        } else {
+            setFile(null);
         }
     };
 
     const handleUpload = async () => {
         if (!file) return;
 
+        const error = validateFile(file);
+        if (error) {
+            setMessage(error);
+            setIsError(true);
+            setFile(null);
+            return;
+        }
+
         setUploading(true);
         setMessage('');
+        setIsError(false);
 
         try {
             await uploadCSV(file);
             setMessage('Upload successful!');
+            setIsError(false);
             onUploadSuccess();
         } catch (error) {
             console.error(error);
             setMessage('Upload failed. Please try again.');
+            setIsError(true);
         } finally {
             setUploading(false);
         }
@@ -59,7 +104,7 @@ const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
                 >
                     {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Upload'}
                 </button>
-                {message && <p className={`text-sm ${message.includes('failed') ? 'text-red-500' : 'text-green-500'}`}>{message}</p>}
+                {message && <p className={`text-sm ${isError ? 'text-red-500' : 'text-green-500'}`}>{message}</p>}
             </div>
         </div>
     );
